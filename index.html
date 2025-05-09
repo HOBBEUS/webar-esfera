@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Esfera RA con marcador personalizado</title>
+    <title>Esfera física RA</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <style> body { margin: 0; overflow: hidden; } </style>
@@ -10,41 +10,56 @@
     <a-scene embedded arjs>
       <!-- Marcador personalizado -->
       <a-marker id="mi-marcador" type="pattern" url="mipattern.patt">
-        <a-sphere id="esfera" position="0 0.5 0" radius="0.3" color="red"></a-sphere>
+        <!-- Esfera pequeña, empieza en el centro -->
+        <a-sphere id="esfera" position="0 0.1 0" radius="0.1" color="red"></a-sphere>
       </a-marker>
 
       <a-entity camera></a-entity>
     </a-scene>
 
     <script>
-      AFRAME.registerComponent('movimiento-dinamico', {
+      AFRAME.registerComponent('fisica-esfera', {
         init: function () {
-          this.lastPosition = new THREE.Vector3();
+          this.marker = document.querySelector('#mi-marcador').object3D;
+          this.sphere = document.querySelector('#esfera').object3D;
+          this.velocity = new THREE.Vector3(); // velocidad de la esfera
+          this.lastMarkerPosition = new THREE.Vector3();
           this.tempPosition = new THREE.Vector3();
-          this.esfera = document.querySelector('#esfera');
         },
-        tick: function () {
-          const marcador = document.querySelector('#mi-marcador').object3D;
+        tick: function (time, deltaTime) {
+          if (!this.marker.visible) return;
 
-          if (!marcador.visible) return;
+          this.marker.getWorldPosition(this.tempPosition);
+          const deltaMarker = this.tempPosition.clone().sub(this.lastMarkerPosition);
 
-          marcador.getWorldPosition(this.tempPosition);
+          // Simular fuerza basada en el movimiento del marcador
+          const force = deltaMarker.clone().multiplyScalar(30); // fuerza basada en movimiento
 
-          const delta = this.tempPosition.clone().sub(this.lastPosition);
-          const intensidad = 5;
-          const nuevaPos = new THREE.Vector3(
-            delta.x * intensidad,
-            0.5 + delta.y * intensidad,
-            delta.z * intensidad
-          );
+          // Aplicar la fuerza como aceleración
+          this.velocity.add(force);
 
-          this.esfera.object3D.position.lerp(nuevaPos, 0.1);
-          this.lastPosition.copy(this.tempPosition);
+          // Fricción (para que se frene si no hay movimiento)
+          this.velocity.multiplyScalar(0.9);
+
+          // Limitar la distancia al centro (como si hubiera un borde)
+          const pos = this.sphere.position.clone().add(this.velocity.clone().multiplyScalar(0.016)); // 0.016 = aprox 60 fps
+          const maxDist = 0.4;
+          if (pos.length() > maxDist) {
+            pos.normalize().multiplyScalar(maxDist); // si se pasa del borde, la regresamos
+            this.velocity.multiplyScalar(-0.3); // rebote suave
+          }
+
+          // Actualizar posición
+          this.sphere.position.copy(pos);
+
+          // Guardar posición para siguiente frame
+          this.lastMarkerPosition.copy(this.tempPosition);
         }
       });
 
-      document.querySelector('a-scene').setAttribute('movimiento-dinamico', '');
+      document.querySelector('a-scene').setAttribute('fisica-esfera', '');
     </script>
   </body>
 </html>
+
 
