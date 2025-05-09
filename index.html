@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Esfera física RA</title>
+    <title>Esfera física RA lenta y pesada</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <style> body { margin: 0; overflow: hidden; } </style>
@@ -10,8 +10,8 @@
     <a-scene embedded arjs>
       <!-- Marcador personalizado -->
       <a-marker id="mi-marcador" type="pattern" url="mipattern.patt">
-        <!-- Esfera pequeña, empieza en el centro -->
-        <a-sphere id="esfera" position="0 0.1 0" radius="0.1" color="red"></a-sphere>
+        <!-- Esfera más grande -->
+        <a-sphere id="esfera" position="0 0.1 0" radius="0.2" color="green"></a-sphere>
       </a-marker>
 
       <a-entity camera></a-entity>
@@ -32,27 +32,26 @@
           this.marker.getWorldPosition(this.tempPosition);
           const deltaMarker = this.tempPosition.clone().sub(this.lastMarkerPosition);
 
-          // Simular fuerza basada en el movimiento del marcador
-          const force = deltaMarker.clone().multiplyScalar(30); // fuerza basada en movimiento
+          // Fuerza reducida para simular más peso
+          const force = deltaMarker.clone().multiplyScalar(10); // antes era 30
 
-          // Aplicar la fuerza como aceleración
+          // Aplicar fuerza como aceleración
           this.velocity.add(force);
 
-          // Fricción (para que se frene si no hay movimiento)
-          this.velocity.multiplyScalar(0.9);
+          // Más fricción (pierde velocidad más rápido)
+          this.velocity.multiplyScalar(0.85); // antes era 0.9
 
-          // Limitar la distancia al centro (como si hubiera un borde)
-          const pos = this.sphere.position.clone().add(this.velocity.clone().multiplyScalar(0.016)); // 0.016 = aprox 60 fps
+          // Mover esfera con su velocidad (más lenta al reducir multiplicador)
+          const pos = this.sphere.position.clone().add(this.velocity.clone().multiplyScalar(0.012)); // antes era 0.016
+
+          // Limitar la distancia al centro (como si tuviera un borde)
           const maxDist = 0.4;
           if (pos.length() > maxDist) {
-            pos.normalize().multiplyScalar(maxDist); // si se pasa del borde, la regresamos
+            pos.normalize().multiplyScalar(maxDist);
             this.velocity.multiplyScalar(-0.3); // rebote suave
           }
 
-          // Actualizar posición
           this.sphere.position.copy(pos);
-
-          // Guardar posición para siguiente frame
           this.lastMarkerPosition.copy(this.tempPosition);
         }
       });
