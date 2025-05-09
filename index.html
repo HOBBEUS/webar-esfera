@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Juego AR - Descubre la Imagen</title>
+    <title>Juego AR - Esfera Realista</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <style>
@@ -61,20 +61,8 @@
       </a-assets>
 
       <a-marker id="mi-marcador" type="pattern" url="mipattern.patt">
-        <!-- Imagen base -->
         <a-plane position="0 0 0" rotation="-90 0 0" width="1" height="1" src="#imagenBase"></a-plane>
-
-        <!-- Imagen descubierta (revelada por la esfera) -->
-        <a-plane 
-          id="plano-revelador" 
-          position="0 0.01 0" 
-          rotation="-90 0 0" 
-          width="1" 
-          height="1" 
-          material="shader: flat; src: #canvasReveal; transparent: true;">
-        </a-plane>
-
-        <!-- Esfera controlada por el movimiento del marcador -->
+        <a-plane id="plano-revelador" position="0 0.01 0" rotation="-90 0 0" width="1" height="1" material="shader: flat; src: #canvasReveal; transparent: true;"></a-plane>
         <a-sphere id="esfera" position="0 0.1 0" radius="0.15" color="red"></a-sphere>
       </a-marker>
 
@@ -99,32 +87,34 @@
           document.querySelector('#plano-revelador').getObject3D('mesh').material.map = this.texture;
 
           this.velocity = new THREE.Vector3();
-          this.lastMarkerPosition = new THREE.Vector3();
-          this.tempPosition = new THREE.Vector3();
-
-          this.ultimoChequeo = Date.now();
           this.ganado = false;
+          this.ultimoChequeo = Date.now();
         },
         tick: function () {
           if (!this.marker.visible) return;
 
-          this.marker.getWorldPosition(this.tempPosition);
-          const delta = this.tempPosition.clone().sub(this.lastMarkerPosition);
-          const force = delta.clone().multiplyScalar(10);
-          this.velocity.add(force);
-          this.velocity.multiplyScalar(0.85);
+          // Obtener inclinacion del marcador como pendiente
+          const rot = new THREE.Euler();
+          rot.setFromRotationMatrix(this.marker.matrixWorld);
 
-          const pos = this.sphere.position.clone().add(this.velocity.clone().multiplyScalar(0.012));
-          const maxDist = 0.4;
-          if (pos.length() > maxDist) {
-            pos.normalize().multiplyScalar(maxDist);
-            this.velocity.multiplyScalar(-0.3);
-          }
-          this.sphere.position.copy(pos);
-          this.lastMarkerPosition.copy(this.tempPosition);
+          const gravedad = new THREE.Vector3(
+            Math.sin(rot.x),
+            -Math.sin(rot.y),
+            -Math.sin(rot.z)
+          );
 
-          const uvx = (pos.x + 0.5) * 1024;
-          const uvy = (0.5 - pos.z) * 1024;
+          this.velocity.add(gravedad.multiplyScalar(0.002));
+          this.velocity.multiplyScalar(0.96);
+
+          this.sphere.position.add(this.velocity);
+
+          const max = 0.45;
+          this.sphere.position.x = Math.max(-max, Math.min(max, this.sphere.position.x));
+          this.sphere.position.y = Math.max(0.05, Math.min(0.4, this.sphere.position.y));
+          this.sphere.position.z = Math.max(-max, Math.min(max, this.sphere.position.z));
+
+          const uvx = (this.sphere.position.x + 0.5) * 1024;
+          const uvy = (0.5 - this.sphere.position.z) * 1024;
 
           this.ctx.beginPath();
           this.ctx.arc(uvx, uvy, 40, 0, Math.PI * 2);
@@ -135,7 +125,6 @@
           const ahora = Date.now();
           if (ahora - this.ultimoChequeo > 1000 && !this.ganado) {
             this.ultimoChequeo = ahora;
-
             const imgData = this.ctx.getImageData(0, 0, 1024, 1024);
             let descubiertos = 0;
             for (let i = 3; i < imgData.data.length; i += 4) {
@@ -172,6 +161,7 @@
         const comp = document.querySelector('a-scene').components['descubrir-imagen'];
         comp.ganado = false;
         comp.ultimoChequeo = Date.now();
+        comp.velocity.set(0, 0, 0);
       });
     </script>
   </body>
