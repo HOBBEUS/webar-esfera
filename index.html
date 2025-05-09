@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Revela la imagen moviendo la esfera</title>
+    <title>Juego de descubrir imagen en AR</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <style> body { margin: 0; overflow: hidden; } </style>
@@ -10,37 +10,56 @@
     <a-scene embedded arjs>
       <!-- Marcador personalizado -->
       <a-marker id="mi-marcador" type="pattern" url="mipattern.patt">
-        <!-- Plano base: marcador visible con imagen original -->
+        
+        <!-- Plano base con imagen original -->
         <a-plane position="0 0 0" rotation="-90 0 0" width="1" height="1" src="#imagenBase"></a-plane>
 
-        <!-- Plano superior: imagen que será revelada -->
+        <!-- Plano con textura dinámica para revelar imagen descubierta -->
         <a-plane 
-          id="imagen-revelada" 
+          id="plano-revelador" 
           position="0 0.01 0" 
           rotation="-90 0 0" 
           width="1" 
           height="1" 
-          material="shader: flat; src: #imagenOculta; transparent: true; opacity: 0.0;">
+          material="shader: flat; src: #texturaCanvas; transparent: true;">
         </a-plane>
 
-        <!-- Esfera -->
+        <!-- Esfera que se mueve -->
         <a-sphere id="esfera" position="0 0.1 0" radius="0.15" color="red"></a-sphere>
       </a-marker>
 
       <a-assets>
         <img id="imagenBase" src="base.jpg">
-        <img id="imagenOculta" src="descubierta.png">
+        <img id="imagenDescubierta" src="descubierta.png">
+        <canvas id="canvasReveal" width="1024" height="1024"></canvas>
       </a-assets>
 
       <a-entity camera></a-entity>
     </a-scene>
 
     <script>
-      AFRAME.registerComponent('fisica-y-revelado', {
+      AFRAME.registerComponent('descubrir-imagen', {
         init: function () {
+          // Elementos 3D
           this.marker = document.querySelector('#mi-marcador').object3D;
           this.sphere = document.querySelector('#esfera').object3D;
-          this.overlay = document.querySelector('#imagen-revelada');
+
+          // Canvas y contexto
+          const canvas = document.getElementById('canvasReveal');
+          this.ctx = canvas.getContext('2d');
+
+          // Imagen descubierta
+          const img = document.getElementById('imagenDescubierta');
+          img.onload = () => {
+            this.ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            this.ctx.globalCompositeOperation = 'destination-in';
+          };
+
+          this.canvas = canvas;
+          this.texture = new THREE.CanvasTexture(canvas);
+          document.querySelector('#plano-revelador').getObject3D('mesh').material.map = this.texture;
+
+          // Movimiento de física
           this.velocity = new THREE.Vector3();
           this.lastMarkerPosition = new THREE.Vector3();
           this.tempPosition = new THREE.Vector3();
@@ -51,12 +70,12 @@
           this.marker.getWorldPosition(this.tempPosition);
           const delta = this.tempPosition.clone().sub(this.lastMarkerPosition);
 
+          // Simular peso
           const force = delta.clone().multiplyScalar(10);
           this.velocity.add(force);
           this.velocity.multiplyScalar(0.85);
 
           const pos = this.sphere.position.clone().add(this.velocity.clone().multiplyScalar(0.012));
-
           const maxDist = 0.4;
           if (pos.length() > maxDist) {
             pos.normalize().multiplyScalar(maxDist);
@@ -66,18 +85,26 @@
           this.sphere.position.copy(pos);
           this.lastMarkerPosition.copy(this.tempPosition);
 
-          // Simulación: si la esfera se aleja del centro, aumentamos opacidad del overlay
-          const distancia = pos.length(); // qué tan lejos del centro está
-          const maxVisible = 0.8;
-          const nuevaOpacidad = Math.min(distancia / maxVisible, 1.0);
-          this.overlay.setAttribute('material', 'opacity', nuevaOpacidad);
+          // Convertir posición de esfera a coordenadas de canvas (UV)
+          const uvx = (pos.x + 0.5) * 1024;
+          const uvy = (0.5 - pos.z) * 1024;
+
+          // Dibujar “máscara” circular transparente
+          this.ctx.beginPath();
+          this.ctx.arc(uvx, uvy, 40, 0, Math.PI * 2); // radio del pincel
+          this.ctx.fillStyle = 'black';
+          this.ctx.fill();
+
+          // Marcar canvas como actualizado
+          this.texture.needsUpdate = true;
         }
       });
 
-      document.querySelector('a-scene').setAttribute('fisica-y-revelado', '');
+      document.querySelector('a-scene').setAttribute('descubrir-imagen', '');
     </script>
   </body>
 </html>
+
 
 
 
